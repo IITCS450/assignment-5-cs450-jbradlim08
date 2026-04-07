@@ -9,17 +9,19 @@
 #define MAX_UTHREADS 8
 #define UTHREAD_STACK_SIZE 4096
 
-enum thread_state {
+enum thread_state
+{
   T_FREE = 0,
   T_RUNNING,
   T_RUNNABLE,
   T_ZOMBIE
 };
 
-struct thread {
+struct thread
+{
   tid_t tid;
   enum thread_state state;
-  void (*start_routine)(void*);
+  void (*start_routine)(void *);
   void *arg;
   void *stack;
   void *stack_top;
@@ -30,25 +32,27 @@ static struct thread threads[MAX_UTHREADS];
 static int current_tid = -1;
 static int library_initialized;
 
-static struct thread*
+static struct thread *
 thread_by_tid(tid_t tid)
 {
   int i;
 
-  for(i = 0; i < MAX_UTHREADS; i++){
-    if(threads[i].state != T_FREE && threads[i].tid == tid)
+  for (i = 0; i < MAX_UTHREADS; i++)
+  {
+    if (threads[i].state != T_FREE && threads[i].tid == tid)
       return &threads[i];
   }
   return 0;
 }
 
-static struct thread*
+static struct thread *
 alloc_thread_slot(void)
 {
   int i;
 
-  for(i = 0; i < MAX_UTHREADS; i++){
-    if(threads[i].state == T_FREE)
+  for (i = 0; i < MAX_UTHREADS; i++)
+  {
+    if (threads[i].state == T_FREE)
       return &threads[i];
   }
   return 0;
@@ -66,12 +70,11 @@ clear_thread(struct thread *t)
   t->waiting_on = -1;
 }
 
-void
-thread_init(void)
+void thread_init(void)
 {
   int i;
 
-  for(i = 0; i < MAX_UTHREADS; i++)
+  for (i = 0; i < MAX_UTHREADS; i++)
     clear_thread(&threads[i]);
 
   threads[0].tid = 0;
@@ -81,20 +84,20 @@ thread_init(void)
   library_initialized = 1;
 }
 
-tid_t
-thread_create(void (*fn)(void*), void *arg)
+tid_t thread_create(void (*fn)(void *), void *arg)
 {
   struct thread *t;
 
-  if(!library_initialized)
+  if (!library_initialized)
     thread_init();
 
   t = alloc_thread_slot();
-  if(t == 0)
+  if (t == 0)
     return -1;
 
   t->stack = malloc(UTHREAD_STACK_SIZE);
-  if(t->stack == 0){
+  if (t->stack == 0)
+  {
     clear_thread(t);
     return -1;
   }
@@ -103,41 +106,47 @@ thread_create(void (*fn)(void*), void *arg)
   t->state = T_RUNNABLE;
   t->start_routine = fn;
   t->arg = arg;
-  t->stack_top = (char*)t->stack + UTHREAD_STACK_SIZE;
+  t->stack_top = (char *)t->stack + UTHREAD_STACK_SIZE;
   t->waiting_on = -1;
 
   // TODO: Prepare the initial saved context so the scheduler can enter fn(arg).
   return t->tid;
 }
 
-void
-thread_yield(void)
+void thread_yield(void)
 {
   struct thread *self;
 
-  if(!library_initialized)
+  if (!library_initialized)
     thread_init();
 
   self = thread_by_tid(current_tid);
-  if(self == 0)
+  if (self == 0)
     return;
 
   // TODO: Pick the next runnable thread and switch contexts.
   self->state = T_RUNNING;
 }
 
-int
-thread_join(tid_t tid)
+int thread_join(tid_t tid)
 {
   struct thread *target;
 
-  if(!library_initialized)
+  if (!library_initialized)
     thread_init();
 
   target = thread_by_tid(tid);
-  if(target == 0 || tid == current_tid)
+  if (target == 0 || tid == current_tid)
     return -1;
 
   // TODO: Yield until the target becomes T_ZOMBIE, then reclaim its stack.
   return (target->state == T_ZOMBIE) ? 0 : -1;
+}
+
+tid_t thread_self(void)
+{
+  if (!library_initialized)
+    thread_init();
+
+  return current_tid;
 }
